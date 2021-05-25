@@ -1,0 +1,226 @@
+---
+title: "Storyboard"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(flexdashboard)
+library(tidyverse)
+library(DT)
+library(plotly)
+library(lubridate)
+library(shiny)
+library(shinydashboard)
+library(readxl) 
+library(magrittr) 
+library(readr)
+
+load(file = "recession.RData")
+str(GDP)
+str(Housing_Zillow)
+str(poverty)
+
+GDPRecession <- GDP %>% 
+  mutate(period = as.factor(Year))
+
+str(GDPRecession)
+
+GDPRecession_state <- GDPRecession %>%
+  filter(State %in%  c("Texas", "Florida", "New Jersey", "North Carolina"  ))
+
+GDPRecession$period <- 
+  recode(GDPRecession$period,
+         '2004' = "Pre-Recession",
+         '2005' = "Pre-Recession",
+         '2006' = "Pre-Recession",
+         '2007' = "Pre-Recession",
+         '2008' = "Recession",
+         '2009' = "Recession",
+         '2010' = "Post-Recession",
+         '2011' = "Post-Recession",
+         '2012' = "Post-Recession",
+         .default = "Other"
+  )
+
+
+GDPRecession <- GDPRecession %>% 
+  select(period, everything())
+
+
+```
+
+### Recession impact on GDP before and after recession period
+
+```{r}
+a <- GDPRecession %>% 
+	ggplot(aes(x=factor(Year), y = GDP))+
+	geom_col(aes(fill=period), position = "dodge")+
+	geom_smooth(aes(color=period), SE=TRUE)+
+  labs(
+    x= "Period",
+    y="GDP",
+    fill = "Recession Period")
+ggplotly(a)
+remove(a)
+
+```
+
+*** 
+GDP growth during the pre recession was having a steady growth across all states in the US. There was a slight decrease experienced during the heat of the recession period but the country was able to recover after the period
+
+### GDP accross all selected states
+    
+```{r}
+c <- GDPRecession_state %>% 
+	group_by(State) %>% 
+	ggplot(aes(x=period, y = GDP))+
+	geom_col(aes(fill=`State`), position = "dodge")+
+	geom_smooth(aes(color=State), SE=TRUE)
+ggplotly(c)
+remove(c)
+
+```
+
+*** 
+The GDP of each of these states was affected by the recession but their seems to be a slight recovery after this period. Texas state had a high recovery rate despite the impact of the recession on their economy. 
+There was a decrease experienced during the heat of the recession period and a gradual recovery was experienced after the period
+
+### Household income across the years in the US
+
+```{r}
+a <- poverty %>%
+  ggplot( aes(x=Year, y=`Median Household Income`)) +
+    geom_area(fill="#c43543", alpha=0.5) +
+    geom_line(color="#c43543") +
+    ylab("Household income ($)") 
+ggplotly(a)
+```
+
+***
+Household income was increasing during the pre-recession period, even though there a change during the recession period, it wsas not very significant. Income greatly increased after the recession period.
+
+### Poverty throughout the year
+
+```{r poverty recession year}
+a <- poverty %>%
+  ggplot( aes(x=Year, y=`Poverty Percentage`)) +
+    geom_area(fill="#006400", alpha=0.5) +
+    geom_line(color="#c43543") +
+    ylab("Poverty rate") 
+ggplotly(a)
+
+```
+
+*** 
+There was a surge in the poverty rate during the recession period and there has not been much recovery and decrease in poverty since then. This could be as result of other factors as it was seen that household income actually increased but the poverty rate did not decrease.
+
+### Poverty Rate in Selected states
+
+```{r poverty rate}
+poverty_state <- poverty %>%
+  filter(State %in%  c("TX", "FL", "NJ", "NC"  ))
+
+ua <- poverty_state %>% 
+	ggplot(aes(x=Year, y = `Poverty Percentage`))+
+	geom_col(aes(fill=`State`), position = "dodge")+
+	geom_smooth(aes(color=`State`), SE=TRUE)+
+  labs(
+    x= "Year",
+    y="Poverty Percentage",
+    fill = "States")
+ggplotly(ua)
+
+remove(ua)
+```
+
+*** 
+The poverty rate in each each of the states were high during the recession period even though after the period there was slight decrease, there seems to have been a significant increase in the following years accross all the states.
+
+### Household Income in Selected states
+
+```{r income in states}
+
+ua <- poverty_state %>% 
+	ggplot(aes(x=Year, y = `Median Household Income`))+
+	geom_col(aes(fill=`State`), position = "dodge")+
+	geom_smooth(aes(color=`State`), SE=TRUE)+
+  labs(
+    x= "Year",
+    y="Household Income",
+    fill = "States")
+ggplotly(ua)
+
+remove(a)
+```
+
+***
+There has been a significant increase in states like Texas and New Jersey just like California in our previous study after the decrease during the recession period which could be as a result of the GDP recovery after the period. States like North Carolina and New Jersey had only a slight increase in the income rate.
+
+### Data table for poverty and Household Income
+
+```{r datable poverty}
+
+DT::renderDataTable({poverty_state %>% 
+	select(State, Year,
+		   `Median Household Income`, `Poverty Percentage`) %>%
+	arrange(Year) %>% 
+	datatable(filter = "top", 
+			  options = list(pageLength=20, autowidth=TRUE)) %>% 
+	formatStyle(.,"Median Household Income",
+	    background = styleColorBar(poverty_state$"Median Household Income",
+	    						   'steelblue'),
+	    backgroundSize = '100% 90%',
+	    backgroundRepeat = 'no-repeat',
+	    backgroundPosition = 'center')
+})
+```
+
+### Housing price in Each state
+
+```{r}
+
+housing_state <- Housing_Zillow %>%
+  filter(State %in%  c("TX", "FL", "NJ", "NC"  ))
+hchart <- housing_state %>% 
+	group_by(State) %>% 
+	ggplot(aes(x=as.factor(Year), y = `Housing`))+
+	geom_col(aes(fill=`State`), position = "dodge")+
+	geom_smooth(aes(color=`State`))+
+  labs(
+    x= "Year",
+    y="Housing",
+    fill = "States")
+
+ggplotly(hchart)
+remove(hchart)
+
+
+```
+
+*** 
+Housing price was high during towards the beginning of the recession period, there has been a decrease in the price after the period which can be considered as recovering.
+
+### Data table for housing price : This can be used to search out information for each states
+
+```{r housing recession}
+
+
+
+DT::renderDataTable({housing_state %>% 
+	select(State, Year,
+		   Housing, Sizerank) %>%
+	arrange(Year) %>% 
+	datatable(filter = "top", 
+			  options = list(pageLength=20, autowidth=TRUE)) %>% 
+	formatStyle(.,"Housing",
+	    background = styleColorBar(housing_state$"Housing",
+	    						   'steelblue'),
+	    backgroundSize = '100% 90%',
+	    backgroundRepeat = 'no-repeat',
+	    backgroundPosition = 'center')
+})
+```
